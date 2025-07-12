@@ -1,0 +1,50 @@
+version: '3.8'
+
+services:
+  mosquitto:
+    image: eclipse-mosquitto:2.0.22 # Or whatever version you're using
+    container_name: mosquitto-broker
+    ports:
+      - "1883:1883"
+      - "9001:9001" # If you use websockets for Mosquitto
+    volumes:
+      # Mount your custom config file into the container's config path
+      - ./mosquitto/config/mosquitto.conf:/mosquitto/config/mosquitto.conf
+    # Optional: Set command if Mosquitto requires explicit config file
+    command: mosquitto -c /mosquitto/config/mosquitto.conf
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./backend
+    container_name: weather_dashboard_backend
+    ports:
+      - "5000:5000"
+    environment:
+      MQTT_BROKER: mosquitto
+    depends_on:
+      - mosquitto
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+    container_name: weather_dashboard_frontend
+    ports:
+      - "5173:80"
+    environment:
+      VITE_WS_URL: http://localhost:5000
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  simulator:
+    build:
+      context: ./simulator 
+    container_name: iot_simulator
+    environment:
+      MQTT_BROKER: mosquitto
+    # No need for 'command' here if it's set in the simulator Dockerfile's CMD
+    depends_on:
+      - mosquitto
+    restart: unless-stopped
